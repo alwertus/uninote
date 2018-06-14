@@ -1,67 +1,61 @@
 package ru.alwertus.uninote.server;
 
-import ru.alwertus.uninote.common.WFunc;
-import ru.alwertus.uninote.network.TCPConnection;
-import ru.alwertus.uninote.network.TCPConnectionListener;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.codec.string.StringEncoder;
+import ru.alwertus.uninote.common.Values;
 
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.util.ArrayList;
+public class Server {
+    private int port;
 
-public class Server implements TCPConnectionListener {
-
-    private final ArrayList<TCPConnection> connections = new ArrayList<>(); // массив соединений
-    public static final int PORT = 5188;
-
-    // точка входа
-    public static void main(String[] args) {
-        new Server();
+    // constructor
+    public Server(int port) {
+        this.port = port;
     }
 
+    // main
+    public static void main(String[] args) throws Exception {
+        new Server(Values.PORT).run();
+    }
 
-    // конструктор (вызывается сразу при запуске)
-    private Server() {
-        WFunc.log("Server running...");
-        try(ServerSocket serverSocket = new ServerSocket(PORT)) {   // слушает порт на наличие входящих подключений
-            while(true) {                                           // бесконечный цикл
-                try {
-                    // accept возвращает Socket как только соединение установилось. его мы передаём в TCPConnection и указываем слушателя (себя - this)
-                    new TCPConnection(this, serverSocket.accept());
-                } catch (IOException e) {
-                    WFunc.log("TCPConnection exception: " + e);
-                }
-            }
+    private void run() throws Exception {
+        EventLoopGroup bossGroup = new NioEventLoopGroup(); // группа событий, используемая при создании каналов между серверами и клиентом
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        try {
+            ServerBootstrap b = new ServerBootstrap();
+            b.group(bossGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)      // говорим серверу о том, какой типа канала используется для общения
+                    .childHandler(
+                            new ChannelInitializer<SocketChannel>() {
+                                @Override
+                                protected void initChannel(SocketChannel ch) throws Exception {
+                                    ch.pipeline().addLast(
+                                            new ServerHandler(),
+                                            new StringDecoder(),
+                                            new StringEncoder()
+                                    );
+                                    //ch.pipeline().addLast("handler", new ServerHandler());  // обработчик входящих сообщений от клиента
+                                    //ch.pipeline().addLast("decoder", new StringDecoder());  // декодирует приходящие данные в строку
+                                    //ch.pipeline().addLast("encoder", new StringEncoder());  // кодирует строку в байты при отправке
+                                }
+                            })
+            //.option(ChannelOption.SO_BACKLOG, 128)
+            //.childOption(ChannelOption.SO_KEEPALIVE, true)
+            ;
 
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            ChannelFuture f = b.bind(port).sync();
+            System.out.println(Values.LOG_SERVER_STARTING);
+
+            f.channel().closeFuture().sync();
+        } finally {
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
         }
-
-    }
-
-
-
-    // ----- реализация TCPConnectionListener
-
-    @Override
-    public synchronized void onConnectionReady(TCPConnection tcpConnection) {
-        connections.add(tcpConnection);
-        WFunc.log("Client connected (" + tcpConnection + ")");
-    }
-
-    @Override
-    public synchronized void onReceiveString(TCPConnection tcpConnection, String value) {
-        WFunc.log(tcpConnection + " send: " + value);
-    }
-
-    @Override
-    public synchronized void onDisconnect(TCPConnection tcpConnection) {
-        connections.remove(tcpConnection);
-        WFunc.log("Client disconnected (" + tcpConnection + ")");
-    }
-
-    @Override
-    public synchronized void onException(TCPConnection tcpConnection, Exception e) {
-        WFunc.log("Error: " + e);
-        //tcpConnection.disconnect();
     }
 }
