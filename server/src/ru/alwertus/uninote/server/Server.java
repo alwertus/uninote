@@ -11,6 +11,8 @@ import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import ru.alwertus.uninote.common.Values;
 
+import javax.swing.*;
+
 public class Server {
     private int port;
 
@@ -21,7 +23,13 @@ public class Server {
 
     // main
     public static void main(String[] args) throws Exception {
-        new Server(Values.PORT).run();
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                ServerGUI sgui = new ServerGUI();
+            }
+        });
+        //new Server(Values.PORT).run();
     }
 
     private void run() throws Exception {
@@ -50,7 +58,7 @@ public class Server {
             ;
 
             ChannelFuture f = b.bind(port).sync();
-            System.out.println(Values.LOG_SERVER_STARTING);
+            ServerGUI.printLog("info", Values.LOG_SERVER_STARTING);
 
             f.channel().closeFuture().sync();
         } finally {

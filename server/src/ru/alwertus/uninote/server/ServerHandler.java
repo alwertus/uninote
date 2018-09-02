@@ -41,18 +41,18 @@ public class ServerHandler extends SimpleChannelInboundHandler<String> {
         if (message.isCommand) {
             switch (message.commandCode) {
                 case 0:
-                    System.out.println(clientInfo.getName() + " пытается выйти");
+                    log(clientInfo.getName() + " пытается выйти");
                     ctx.close();
                     break;
                 case 1:
-                    System.out.println("! " + clientInfo.getName() + " меняет имя на " + message.commandParam);
+                    log(clientInfo.getName() + " меняет имя на " + message.commandParam);
                     clientInfo.changeName(message.commandParam);
                     break;
             }
         }
 
         else
-            System.out.println(clientInfo.getName() + " говоирт: " + message.fullMsg);
+            log(clientInfo.getName() + " говоирт: " + message.fullMsg);
     }
 
     @Override
@@ -68,24 +68,33 @@ public class ServerHandler extends SimpleChannelInboundHandler<String> {
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         Channel incoming = ctx.channel();
-        System.out.println("! " + clientInfo.getName() + " присоеденился");
+        log(clientInfo.getName() + " присоеденился");
         CHANNELS.add(incoming);
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         Channel removed = ctx.channel();
-        System.out.println("! " + clientInfo.getName() + " отключился");
+        log(clientInfo.getName() + " отключился");
         CHANNELS.remove(removed);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println("! Хуйня какаято случилась с " + clientInfo.getName() + ": " + cause);
+        log("err", "Хуйня какаято случилась с " + clientInfo.getName() + ": " + cause);
         ctx.close();
     }
 
     private static void sendStrToChannel(Channel ch, String msg) {
         ch.writeAndFlush(msg + "\r\n");
+    }
+
+
+    void log(String msg) {
+        log("info", msg);
+    }
+    void log(String category, String msg) {
+        System.out.println("! " + msg);
+        ServerGUI.printLog("info", msg);
     }
 }
